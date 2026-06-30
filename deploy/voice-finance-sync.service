@@ -1,0 +1,24 @@
+# 云同步后端的 systemd 守护服务（可选，仅在需要多设备同步时部署）
+# 安装：
+#   sudo cp deploy/voice-finance-sync.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now voice-finance-sync
+# 查看日志： journalctl -u voice-finance-sync -f
+
+[Unit]
+Description=Voice Finance Sync Server (语音记账云同步后端)
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/var/www/app.b2bsxlj.com/server
+ExecStart=/usr/bin/node server.js
+Environment=PORT=3001
+Environment=DATA_DIR=/var/www/app.b2bsxlj.com/server/data
+Restart=always
+RestartSec=3
+# 按服务器实际情况调整运行用户（CentOS 常为 nginx，Ubuntu 常为 www-data）
+User=root
+
+[Install]
+WantedBy=multi-user.target
