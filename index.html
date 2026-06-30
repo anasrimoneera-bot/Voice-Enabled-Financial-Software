@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#0f766e" />
+  <title>语音记账 · 财务工具</title>
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header class="app-header">
+    <h1>🎙️ 语音记账</h1>
+    <p class="domain">app.b2bsxlj.com</p>
+  </header>
+
+  <main class="container">
+    <!-- 概览 -->
+    <section class="summary" aria-label="收支概览">
+      <div class="summary-card income">
+        <span class="label">收入</span>
+        <strong id="totalIncome">¥0.00</strong>
+      </div>
+      <div class="summary-card expense">
+        <span class="label">支出</span>
+        <strong id="totalExpense">¥0.00</strong>
+      </div>
+      <div class="summary-card balance">
+        <span class="label">结余</span>
+        <strong id="balance">¥0.00</strong>
+      </div>
+    </section>
+
+    <!-- 语音录入 -->
+    <section class="voice-panel">
+      <button id="micBtn" class="mic-btn" aria-label="开始语音录入">
+        <span class="mic-icon">🎤</span>
+        <span id="micLabel">按住或点击说话</span>
+      </button>
+      <p id="voiceHint" class="voice-hint">例如：“午餐 35 元”、“收到工资 8000 元”、“打车 22 块”</p>
+      <p id="transcript" class="transcript" aria-live="polite"></p>
+    </section>
+
+    <!-- 手动录入（兜底） -->
+    <section class="manual-panel">
+      <details>
+        <summary>手动录入 / 编辑</summary>
+        <form id="manualForm" class="manual-form">
+          <div class="field">
+            <label>类型</label>
+            <div class="type-toggle">
+              <label><input type="radio" name="type" value="expense" checked /> 支出</label>
+              <label><input type="radio" name="type" value="income" /> 收入</label>
+            </div>
+          </div>
+          <div class="field">
+            <label for="category">项目</label>
+            <input id="category" type="text" placeholder="如：餐饮、交通、工资" required />
+          </div>
+          <div class="field">
+            <label for="amount">金额（元）</label>
+            <input id="amount" type="number" step="0.01" min="0" placeholder="0.00" required />
+          </div>
+          <button type="submit" class="primary-btn">添加记录</button>
+        </form>
+      </details>
+    </section>
+
+    <!-- 记录列表 -->
+    <section class="records">
+      <div class="records-header">
+        <h2>记录</h2>
+        <div class="filters" role="tablist">
+          <button class="filter-btn active" data-filter="all">全部</button>
+          <button class="filter-btn" data-filter="income">收入</button>
+          <button class="filter-btn" data-filter="expense">支出</button>
+        </div>
+      </div>
+      <ul id="recordList" class="record-list"></ul>
+      <p id="emptyState" class="empty-state">还没有记录，点击上方麦克风开始记账。</p>
+    </section>
+  </main>
+
+  <div id="toast" class="toast" role="status" aria-live="assertive"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>
