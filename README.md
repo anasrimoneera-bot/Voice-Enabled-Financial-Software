@@ -41,6 +41,37 @@ server/package.json     后端启动脚本
 
 ## 部署到 app.b2bsxlj.com
 
+### 0. 用 Git 拉取代码（推荐，便于一键更新）
+
+**本地电脑（Windows CMD）：** 首次克隆到你的本地文件夹，之后双击 `pull.bat` 即可一键更新。
+
+```bat
+cd /d "E:\蓝鲸科技亚马逊表格处理\财务APP"
+git clone https://github.com/anasrimoneera-bot/Voice-Enabled-Financial-Software.git .
+:: 以后更新：双击文件夹内的 pull.bat，或执行
+git pull origin main
+```
+
+**服务器（Linux SSH）：** 首次部署
+
+```bash
+# 安装依赖（CentOS 用 yum，Ubuntu 用 apt）
+sudo yum install -y git nginx nodejs   # 或: sudo apt install -y git nginx nodejs
+
+# 克隆代码到站点目录
+sudo mkdir -p /var/www && cd /var/www
+sudo git clone https://github.com/anasrimoneera-bot/Voice-Enabled-Financial-Software.git app.b2bsxlj.com
+
+# 配置 Nginx（站点 + /api 反代）
+sudo cp /var/www/app.b2bsxlj.com/deploy/nginx.conf /etc/nginx/conf.d/app.b2bsxlj.com.conf
+```
+
+之后每次更新只需：
+
+```bash
+bash /var/www/app.b2bsxlj.com/deploy/update.sh
+```
+
 ### 1. 前端（静态站点）
 
 1. **添加 DNS 解析**：在 B2BSXLJ.COM 控制台为子域名 `app` 添加 **A 记录**（指向服务器公网 IP）或 **CNAME 记录**。
@@ -57,9 +88,14 @@ server/package.json     后端启动脚本
 ### 2. 云同步后端（可选，需要多设备同步时部署）
 
 ```bash
-cd server
-PORT=3001 node server.js          # 启动后监听 3001 端口
-# 建议用 systemd / pm2 守护进程，确保开机自启与崩溃重启
+# 临时启动测试
+cd /var/www/app.b2bsxlj.com/server && PORT=3001 node server.js
+
+# 推荐用 systemd 守护（开机自启 + 崩溃重启），仓库已附服务文件：
+sudo cp /var/www/app.b2bsxlj.com/deploy/voice-finance-sync.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now voice-finance-sync
+sudo systemctl status voice-finance-sync     # 查看运行状态
 ```
 
 `deploy/nginx.conf` 已将 `https://app.b2bsxlj.com/api/` 反向代理到该服务。
