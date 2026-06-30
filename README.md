@@ -8,7 +8,7 @@
 - **日期识别与排序**：识别语音中的日期（如「15号」「6月15日」「昨天」「前天」），记录按日期**升序排列（1→30 日依次）**；同一日的多笔分别单独显示，允许同日相同金额、相同项目的重复录入。
 - **智能分类**：自动将项目归入「餐饮 / 交通 / 购物 / 居住 / 娱乐 / 医疗 / 通讯 / 教育 / 人情 / 工资 / 奖金 / 收入」等分类，并配图标与颜色。
 - **统计图表**：近 6 个月收支柱状图 + 按月份的支出分类占比（纯前端绘制，无第三方库）。
-- **数据导出**：一键导出 CSV 账单（含 BOM，Excel 可正确显示中文），固定采用标准财务流水表列名：`日期 / 流水号 / 摘要 / 账户对方科目 / 辅助核算 / 对方户名 / 对方账号 / 对方银行 / 收入 / 支出 / 备注 / 类别`。
+- **数据导出**：一键导出 **Excel（.xlsx）** 账单，固定采用标准财务流水表列名：`日期 / 流水号 / 摘要 / 账户对方科目 / 辅助核算 / 对方户名 / 对方账号 / 对方银行 / 收入 / 支出 / 备注 / 类别`。收入/支出按类型分列，备注自动填入「录入方式 + 时间」，类别填入智能分类。XLSX 由内置零依赖写出器生成（`xlsx.js`），无需第三方库或联网。
 - **云同步 / 多设备**：可选接入后端，按「同步码」在多台设备间同步账单（含删除同步）。
 - **手动录入**：不方便说话时可手动添加（兜底）。
 - **收支概览 / 筛选 / 删除**：实时统计收入、支出、结余。
@@ -32,6 +32,7 @@ app.js                  语音/日期/金额解析、记录、排序、渲染、
 categories.js           智能分类（关键词 → 分类组 + 图标 + 颜色）
 charts.js               统计图表（月度收支、分类占比）
 sync.js                 云同步前端逻辑
+xlsx.js                 零依赖 XLSX 写出器（导出 Excel）
 manifest.webmanifest    PWA 配置
 deploy/nginx.conf       Nginx 部署示例（静态站点 + /api 反向代理）
 server/server.js        云同步后端（零依赖 Node）
@@ -43,7 +44,7 @@ server/package.json     后端启动脚本
 ### 1. 前端（静态站点）
 
 1. **添加 DNS 解析**：在 B2BSXLJ.COM 控制台为子域名 `app` 添加 **A 记录**（指向服务器公网 IP）或 **CNAME 记录**。
-2. **上传文件**：将根目录下的 `index.html`、`style.css`、`app.js`、`categories.js`、`charts.js`、`sync.js`、`manifest.webmanifest` 上传到服务器目录，如 `/var/www/app.b2bsxlj.com`。
+2. **上传文件**：将根目录下的 `index.html`、`style.css`、`app.js`、`categories.js`、`charts.js`、`sync.js`、`xlsx.js`、`manifest.webmanifest` 上传到服务器目录，如 `/var/www/app.b2bsxlj.com`。
 3. **配置 HTTPS**：为 `app.b2bsxlj.com` 申请 SSL 证书（Let's Encrypt / 阿里云 / 腾讯云均可），语音功能依赖 HTTPS。
 4. **配置 Nginx**：参考 `deploy/nginx.conf`，放入 `/etc/nginx/conf.d/` 后执行：
    ```bash

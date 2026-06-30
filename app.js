@@ -181,7 +181,7 @@ function parseVoiceInput(raw) {
 }
 
 /* ---------- 记录操作 ---------- */
-function addRecord({ type, summary, amount, group, time }) {
+function addRecord({ type, summary, amount, group, time, source }) {
   const record = {
     id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
     type,
@@ -189,6 +189,7 @@ function addRecord({ type, summary, amount, group, time }) {
     group: group || window.Categories.classify(summary).group,
     amount: Math.round(amount * 100) / 100,
     time: time || new Date().toISOString(),
+    source: source || 'manual',
     updatedAt: new Date().toISOString(),
     deleted: false,
   };
@@ -271,7 +272,9 @@ function showToast(msg, isError) {
 }
 
 /* ---------- 导出 CSV ---------- */
-function exportCsv() {
+const SOURCE_LABEL = { voice: '语音', manual: '手动' };
+
+function exportXlsx() {
   const rows = activeRecords();
   if (!rows.length) {
     showToast('暂无记录可导出', true);
@@ -279,36 +282,34 @@ function exportCsv() {
   }
   // 固定的财务流水表列名与顺序，不可更改
   const header = ['日期', '流水号', '摘要', '账户对方科目', '辅助核算', '对方户名', '对方账号', '对方银行', '收入', '支出', '备注', '类别'];
+  const p2 = (x) => String(x).padStart(2, '0');
   const lines = rows
     .slice()
     .sort((a, b) => a.time.localeCompare(b.time))
     .map((r, i) => {
       const d = new Date(r.time);
       const date = `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}`;
-      const amt = String(r.amount); // 保持与样表一致（如 1500、589.3、163.09）
+      // 备注自动填入：录入方式 + 录入时间
+      const remark = `${SOURCE_LABEL[r.source] || '录入'}录入 ${p2(d.getHours())}:${p2(d.getMinutes())}`;
       return [
-        date,
-        i + 1,                                 // 流水号
+        date,                                  // 日期（文本）
+        i + 1,                                 // 流水号（数值）
         r.summary,                             // 摘要
         '', '', '', '', '',                    // 账户对方科目 / 辅助核算 / 对方户名 / 对方账号 / 对方银行
-        r.type === 'income' ? amt : '',        // 收入
-        r.type === 'expense' ? amt : '',       // 支出
-        '',                                    // 备注
+        r.type === 'income' ? r.amount : '',   // 收入（数值）
+        r.type === 'expense' ? r.amount : '',  // 支出（数值）
+        remark,                                // 备注（自动填入）
         r.group || '',                         // 类别
       ];
     });
-  const csv = [header, ...lines]
-    .map((cols) => cols.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(','))
-    .join('\r\n');
-  // 加 BOM 以便 Excel 正确识别中文
-  const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' });
+  const blob = window.XlsxWriter.build('财务流水', header, lines);
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `语音记账_${new Date().toISOString().slice(0, 10)}.csv`;
+  a.download = `语音记账_${new Date().toISOString().slice(0, 10)}.xlsx`;
   a.click();
   URL.revokeObjectURL(url);
-  showToast('已导出 CSV');
+  showToast('已导出 Excel');
 }
 
 /* ---------- 语音识别 ---------- */
@@ -362,7 +363,7 @@ function handleVoiceResult(text) {
     showToast(`未识别到金额：“${text}”，请重试或手动录入`, true);
     return;
   }
-  addRecord(result);
+  addRecord({ ...result, source: 'voice' });
   const typeLabel = result.type === 'income' ? '收入' : '支出';
   const d = new Date(result.time);
   showToast(`已记录 ${d.getMonth() + 1}月${d.getDate()}日 ${typeLabel}·${result.group}：${result.summary} ${fmt(result.amount)}`);
@@ -402,7 +403,7 @@ document.getElementById('manualForm').addEventListener('submit', (e) => {
     showToast('请填写有效的摘要和金额', true);
     return;
   }
-  addRecord({ type, summary, amount });
+  addRecord({ type, summary, amount, source: 'manual' });
   e.target.reset();
   showToast('已添加记录');
 });
@@ -422,7 +423,7 @@ recordList.addEventListener('click', (e) => {
   if (btn) deleteRecord(btn.dataset.id);
 });
 
-document.getElementById('exportBtn').addEventListener('click', exportCsv);
+document.getElementById('exportBtn').addEventListener('click', exportXlsx);
 
 chartMonth.addEventListener('change', () => {
   window.Charts.render(activeRecords(), chartMonth.value);
