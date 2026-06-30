@@ -5,7 +5,10 @@ const STORAGE_KEY = 'voice-finance-records';
 
 function loadRecords() {
   try {
-    return JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
+    const list = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
+    // 兼容旧数据：将旧字段 category 迁移为 summary（摘要）
+    list.forEach((r) => { if (r.summary === undefined && r.category !== undefined) r.summary = r.category; });
+    return list;
   } catch (e) {
     return [];
   }
@@ -126,7 +129,7 @@ function parseDate(text) {
   return { date: dayWithNowTime(new Date(year, month - 1, day)), rest };
 }
 
-// 从语音文本中提取 { type, category, amount, group, time }
+// 从语音文本中提取 { type, summary, amount, group, time }
 function parseVoiceInput(raw) {
   let text = raw.replace(/\s+/g, '').replace(/块钱?|元钱?|圆/g, '元');
 
@@ -155,29 +158,35 @@ function parseVoiceInput(raw) {
     }
   }
 
-  // 提取项目名称：去掉数字、金额单位、日期残留词、收入关键词后剩余的中文
-  let category = text
-    .replace(/[\d,]+\.?\d*/g, '')
-    .replace(/[零一二两三四五六七八九十百千万亿]+元?/g, '')
-    .replace(/元|块|钱|号|日|月|的|了|花|花了|用了|支出|消费|付|付了|给/g, '');
-  INCOME_STRIP.forEach((k) => { category = category.replace(k, ''); });
-  category = category.trim();
-
-  if (!category) category = isIncome ? '收入' : '其他';
-
   // 智能分类：依据原始文本归入分类组
   const group = window.Categories.classify(fullText).group;
 
-  return { type, category, amount, group, time: date.toISOString() };
+  // 生成简要摘要（业务）：去掉口语填充词、日期残留、金额单位后精简
+  // 先去开头的口语前缀（此时数字仍在，避免误伤“记一下”中的“一”）
+  let summary = text.replace(/^(今天|帮我|麻烦|记一下|记录一下|记录|记账|我)+/, '');
+  // 去金额、单位、日期残留
+  summary = summary
+    .replace(/[\d,]+\.?\d*/g, '')
+    .replace(/[零一二两三四五六七八九十百千万亿]+元?/g, '')
+    .replace(/元|块|钱|号|日|月/g, '');
+  // 去动词类口语填充词
+  summary = summary.replace(/(花了|花|用了|支出|消费|付了|付|给|买了|在|了|的)/g, '');
+  INCOME_STRIP.forEach((k) => { summary = summary.replace(k, ''); });
+  summary = summary.trim();
+
+  if (!summary) summary = isIncome ? '收入' : group; // 兜底用分类名
+  if (summary.length > 16) summary = summary.slice(0, 16); // 尽量简要
+
+  return { type, summary, amount, group, time: date.toISOString() };
 }
 
 /* ---------- 记录操作 ---------- */
-function addRecord({ type, category, amount, group, time }) {
+function addRecord({ type, summary, amount, group, time }) {
   const record = {
     id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
     type,
-    category,
-    group: group || window.Categories.classify(category).group,
+    summary,
+    group: group || window.Categories.classify(summary).group,
     amount: Math.round(amount * 100) / 100,
     time: time || new Date().toISOString(),
     updatedAt: new Date().toISOString(),
@@ -233,7 +242,7 @@ function render() {
     const meta = window.Categories.groupMeta(r.group || '其他');
     li.innerHTML = `
       <div class="info">
-        <span class="cat"><span class="cat-icon">${meta.icon}</span>${escapeHtml(r.category)}</span>
+        <span class="cat"><span class="cat-icon">${meta.icon}</span>${escapeHtml(r.summary)}</span>
         <span class="time">${escapeHtml(r.group || '其他')} · ${fmtTime(r.time)}</span>
       </div>
       <div class="right">
@@ -268,7 +277,7 @@ function exportCsv() {
     showToast('暂无记录可导出', true);
     return;
   }
-  const header = ['日期时间', '类型', '分类', '项目', '金额'];
+  const header = ['日期时间', '类型', '分类', '摘要', '金额'];
   const lines = rows
     .slice()
     .sort((a, b) => a.time.localeCompare(b.time))
@@ -276,7 +285,7 @@ function exportCsv() {
       new Date(r.time).toLocaleString('zh-CN'),
       r.type === 'income' ? '收入' : '支出',
       r.group || '其他',
-      r.category,
+      r.summary,
       r.amount.toFixed(2),
     ]);
   const csv = [header, ...lines]
@@ -347,7 +356,7 @@ function handleVoiceResult(text) {
   addRecord(result);
   const typeLabel = result.type === 'income' ? '收入' : '支出';
   const d = new Date(result.time);
-  showToast(`已记录 ${d.getMonth() + 1}月${d.getDate()}日 ${typeLabel}·${result.group}：${result.category} ${fmt(result.amount)}`);
+  showToast(`已记录 ${d.getMonth() + 1}月${d.getDate()}日 ${typeLabel}·${result.group}：${result.summary} ${fmt(result.amount)}`);
 }
 
 function setMicState(on) {
@@ -378,13 +387,13 @@ micBtn.addEventListener('click', toggleListen);
 document.getElementById('manualForm').addEventListener('submit', (e) => {
   e.preventDefault();
   const type = document.querySelector('input[name="type"]:checked').value;
-  const category = document.getElementById('category').value.trim();
+  const summary = document.getElementById('category').value.trim();
   const amount = parseFloat(document.getElementById('amount').value);
-  if (!category || !(amount > 0)) {
-    showToast('请填写有效的项目和金额', true);
+  if (!summary || !(amount > 0)) {
+    showToast('请填写有效的摘要和金额', true);
     return;
   }
-  addRecord({ type, category, amount });
+  addRecord({ type, summary, amount });
   e.target.reset();
   showToast('已添加记录');
 });
