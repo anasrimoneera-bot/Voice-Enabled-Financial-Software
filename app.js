@@ -11,12 +11,17 @@ function loadRecords() {
   }
 }
 
-function saveRecords(records) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(records));
+function saveRecords(recs) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(recs));
 }
 
 let records = loadRecords();
 let currentFilter = 'all';
+
+// 仅未删除的记录（墓碑记录用于跨设备同步，不参与展示/统计）
+function activeRecords() {
+  return records.filter((r) => !r.deleted);
+}
 
 /* ---------- DOM ---------- */
 const micBtn = document.getElementById('micBtn');
@@ -25,6 +30,7 @@ const transcriptEl = document.getElementById('transcript');
 const recordList = document.getElementById('recordList');
 const emptyState = document.getElementById('emptyState');
 const toast = document.getElementById('toast');
+const chartMonth = document.getElementById('chartMonth');
 
 /* ---------- 中文金额解析 ---------- */
 const CN_DIGITS = { 零: 0, 一: 1, 二: 2, 两: 2, 三: 3, 四: 4, 五: 5, 六: 6, 七: 7, 八: 8, 九: 9 };
@@ -70,9 +76,64 @@ const INCOME_KEYWORDS = ['收入', '工资', '薪水', '进账', '收到', '报�
 // 仅用于从项目名称中剔除的通用动词（保留“工资/报销”等名词作为项目名）
 const INCOME_STRIP = ['收入', '收到', '进账', '入账', '收款'];
 
-// 从语音文本中提取 { type, category, amount }
+// 将数字字符串（阿拉伯或中文）转为整数
+function numFrom(s) {
+  return /^\d+$/.test(s) ? parseInt(s, 10) : parseChineseNumber(s);
+}
+
+// 以某天为基准并保留当前时分秒，返回 ISO 时间
+function dayWithNowTime(base) {
+  const now = new Date();
+  base.setHours(now.getHours(), now.getMinutes(), now.getSeconds(), 0);
+  return base;
+}
+
+// 从文本中识别日期，返回 { date, rest }；rest 为剔除日期词后的文本。未识别到则 date 为当天。
+function parseDate(text) {
+  const now = new Date();
+  let rest = text;
+
+  // 相对日期
+  const rel = { 大前天: -3, 前天: -2, 昨天: -1, 今天: 0, 明天: 1 };
+  for (const word in rel) {
+    if (rest.includes(word)) {
+      const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() + rel[word]);
+      return { date: dayWithNowTime(d), rest: rest.replace(word, '') };
+    }
+  }
+
+  // 绝对日期：可选“X月” + “X号/X日”
+  let month = now.getMonth() + 1;
+  let day = null;
+  const mMatch = rest.match(/(\d{1,2}|[一二两三四五六七八九十]+)月/);
+  if (mMatch) {
+    const mv = numFrom(mMatch[1]);
+    if (mv >= 1 && mv <= 12) { month = mv; rest = rest.replace(mMatch[0], ''); }
+  }
+  const dMatch = rest.match(/(\d{1,2}|[一二两三四五六七八九十]+)[号日]/);
+  if (dMatch) {
+    const dv = numFrom(dMatch[1]);
+    if (dv >= 1 && dv <= 31) { day = dv; rest = rest.replace(dMatch[0], ''); }
+  }
+
+  if (day === null && !mMatch) {
+    return { date: now, rest }; // 未提及日期，默认当天
+  }
+  if (day === null) day = now.getDate();
+  // 若指定月份晚于当前月份，视为去年（如年底录入“明年”不在此处理范围）
+  let year = now.getFullYear();
+  if (month > now.getMonth() + 1) year -= 1;
+  return { date: dayWithNowTime(new Date(year, month - 1, day)), rest };
+}
+
+// 从语音文本中提取 { type, category, amount, group, time }
 function parseVoiceInput(raw) {
-  const text = raw.replace(/\s+/g, '').replace(/块钱?|元钱?|圆/g, '元');
+  let text = raw.replace(/\s+/g, '').replace(/块钱?|元钱?|圆/g, '元');
+
+  // 先识别并剔除日期词，避免“15号…35元”把日期当成金额
+  const { date, rest } = parseDate(text);
+  const fullText = text; // 保留原文用于分类
+  text = rest;
 
   // 判定收入 / 支出
   const isIncome = INCOME_KEYWORDS.some((k) => text.includes(k));
@@ -94,37 +155,49 @@ function parseVoiceInput(raw) {
     }
   }
 
-  // 提取项目名称：去掉数字、金额单位、收入关键词后剩余的中文
+  // 提取项目名称：去掉数字、金额单位、日期残留词、收入关键词后剩余的中文
   let category = text
     .replace(/[\d,]+\.?\d*/g, '')
     .replace(/[零一二两三四五六七八九十百千万亿]+元?/g, '')
-    .replace(/元|块|钱|的|了|花|花了|用了|支出|消费|付|付了|给/g, '');
+    .replace(/元|块|钱|号|日|月|的|了|花|花了|用了|支出|消费|付|付了|给/g, '');
   INCOME_STRIP.forEach((k) => { category = category.replace(k, ''); });
   category = category.trim();
 
   if (!category) category = isIncome ? '收入' : '其他';
 
-  return { type, category, amount };
+  // 智能分类：依据原始文本归入分类组
+  const group = window.Categories.classify(fullText).group;
+
+  return { type, category, amount, group, time: date.toISOString() };
 }
 
 /* ---------- 记录操作 ---------- */
-function addRecord({ type, category, amount }) {
+function addRecord({ type, category, amount, group, time }) {
   const record = {
     id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
     type,
     category,
+    group: group || window.Categories.classify(category).group,
     amount: Math.round(amount * 100) / 100,
-    time: new Date().toISOString(),
+    time: time || new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    deleted: false,
   };
   records.unshift(record);
   saveRecords(records);
   render();
+  maybeAutoSync();
 }
 
 function deleteRecord(id) {
-  records = records.filter((r) => r.id !== id);
+  // 软删除：保留墓碑记录以便跨设备同步删除
+  const r = records.find((x) => x.id === id);
+  if (!r) return;
+  r.deleted = true;
+  r.updatedAt = new Date().toISOString();
   saveRecords(records);
   render();
+  maybeAutoSync();
 }
 
 /* ---------- 渲染 ---------- */
@@ -139,13 +212,17 @@ function fmtTime(iso) {
 }
 
 function render() {
-  const income = records.filter((r) => r.type === 'income').reduce((s, r) => s + r.amount, 0);
-  const expense = records.filter((r) => r.type === 'expense').reduce((s, r) => s + r.amount, 0);
+  const active = activeRecords();
+  const income = active.filter((r) => r.type === 'income').reduce((s, r) => s + r.amount, 0);
+  const expense = active.filter((r) => r.type === 'expense').reduce((s, r) => s + r.amount, 0);
   document.getElementById('totalIncome').textContent = fmt(income);
   document.getElementById('totalExpense').textContent = fmt(expense);
   document.getElementById('balance').textContent = fmt(income - expense);
 
-  const visible = records.filter((r) => currentFilter === 'all' || r.type === currentFilter);
+  // 按日期升序排列（同月内 1→30 日依次排列；同一日的多笔分别单独显示，不去重）
+  const visible = active
+    .filter((r) => currentFilter === 'all' || r.type === currentFilter)
+    .sort((a, b) => a.time.localeCompare(b.time));
   recordList.innerHTML = '';
   emptyState.style.display = visible.length ? 'none' : 'block';
 
@@ -153,10 +230,11 @@ function render() {
     const li = document.createElement('li');
     li.className = `record-item ${r.type}`;
     const sign = r.type === 'income' ? '+' : '-';
+    const meta = window.Categories.groupMeta(r.group || '其他');
     li.innerHTML = `
       <div class="info">
-        <span class="cat">${escapeHtml(r.category)}</span>
-        <span class="time">${fmtTime(r.time)}</span>
+        <span class="cat"><span class="cat-icon">${meta.icon}</span>${escapeHtml(r.category)}</span>
+        <span class="time">${escapeHtml(r.group || '其他')} · ${fmtTime(r.time)}</span>
       </div>
       <div class="right">
         <span class="amt">${sign}${fmt(r.amount).slice(1)}</span>
@@ -164,6 +242,10 @@ function render() {
       </div>`;
     recordList.appendChild(li);
   });
+
+  // 更新统计图表
+  const month = window.Charts.populateMonths(active, chartMonth);
+  window.Charts.render(active, month);
 }
 
 function escapeHtml(s) {
@@ -177,6 +259,38 @@ function showToast(msg, isError) {
   toast.className = 'toast show' + (isError ? ' error' : '');
   clearTimeout(showToast._t);
   showToast._t = setTimeout(() => { toast.className = 'toast'; }, 2600);
+}
+
+/* ---------- 导出 CSV ---------- */
+function exportCsv() {
+  const rows = activeRecords();
+  if (!rows.length) {
+    showToast('暂无记录可导出', true);
+    return;
+  }
+  const header = ['日期时间', '类型', '分类', '项目', '金额'];
+  const lines = rows
+    .slice()
+    .sort((a, b) => a.time.localeCompare(b.time))
+    .map((r) => [
+      new Date(r.time).toLocaleString('zh-CN'),
+      r.type === 'income' ? '收入' : '支出',
+      r.group || '其他',
+      r.category,
+      r.amount.toFixed(2),
+    ]);
+  const csv = [header, ...lines]
+    .map((cols) => cols.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(','))
+    .join('\r\n');
+  // 加 BOM 以便 Excel 正确识别中文
+  const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `语音记账_${new Date().toISOString().slice(0, 10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast('已导出 CSV');
 }
 
 /* ---------- 语音识别 ---------- */
@@ -232,7 +346,8 @@ function handleVoiceResult(text) {
   }
   addRecord(result);
   const typeLabel = result.type === 'income' ? '收入' : '支出';
-  showToast(`已记录 ${typeLabel}：${result.category} ${fmt(result.amount)}`);
+  const d = new Date(result.time);
+  showToast(`已记录 ${d.getMonth() + 1}月${d.getDate()}日 ${typeLabel}·${result.group}：${result.category} ${fmt(result.amount)}`);
 }
 
 function setMicState(on) {
@@ -274,7 +389,7 @@ document.getElementById('manualForm').addEventListener('submit', (e) => {
   showToast('已添加记录');
 });
 
-/* ---------- 筛选 & 删除 ---------- */
+/* ---------- 筛选 / 删除 / 导出 / 月份切换 ---------- */
 document.querySelectorAll('.filter-btn').forEach((btn) => {
   btn.addEventListener('click', () => {
     document.querySelectorAll('.filter-btn').forEach((b) => b.classList.remove('active'));
@@ -289,5 +404,58 @@ recordList.addEventListener('click', (e) => {
   if (btn) deleteRecord(btn.dataset.id);
 });
 
+document.getElementById('exportBtn').addEventListener('click', exportCsv);
+
+chartMonth.addEventListener('change', () => {
+  window.Charts.render(activeRecords(), chartMonth.value);
+});
+
+/* ---------- 云同步 ---------- */
+const syncStatusEl = document.getElementById('syncStatus');
+
+function setSyncStatus(short, toastMsg, isError) {
+  syncStatusEl.textContent = short ? '· ' + short : '';
+  if (toastMsg) showToast(toastMsg, isError);
+}
+
+// 注入 sync.js 所需的回调
+window.Sync.hooks.getRecords = () => records;
+window.Sync.hooks.setRecords = (merged) => {
+  records = merged;
+  saveRecords(records);
+  render();
+};
+window.Sync.hooks.onStatus = setSyncStatus;
+
+let autoSyncTimer = null;
+function maybeAutoSync() {
+  const cfg = window.Sync.getConfig();
+  if (!cfg.auto || !window.Sync.isConfigured()) return;
+  clearTimeout(autoSyncTimer);
+  autoSyncTimer = setTimeout(() => window.Sync.syncNow(true), 1200);
+}
+
+function loadSyncSettings() {
+  const cfg = window.Sync.getConfig();
+  document.getElementById('syncUrl').value = cfg.url || '';
+  document.getElementById('syncAccount').value = cfg.account || '';
+  document.getElementById('autoSync').checked = !!cfg.auto;
+  if (window.Sync.isConfigured()) setSyncStatus('已配置');
+}
+
+document.getElementById('saveSyncBtn').addEventListener('click', () => {
+  window.Sync.saveConfig({
+    url: document.getElementById('syncUrl').value.trim(),
+    account: document.getElementById('syncAccount').value.trim(),
+    auto: document.getElementById('autoSync').checked,
+  });
+  setSyncStatus(window.Sync.isConfigured() ? '已配置' : '', '已保存同步设置');
+});
+
+document.getElementById('syncNowBtn').addEventListener('click', () => window.Sync.syncNow(false));
+
 /* ---------- 初始化 ---------- */
+loadSyncSettings();
 render();
+// 启动时若已配置同步，自动拉取一次
+if (window.Sync.isConfigured()) window.Sync.syncNow(true);

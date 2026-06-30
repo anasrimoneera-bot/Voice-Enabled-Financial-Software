@@ -129,3 +129,61 @@ body {
 }
 .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 .toast.error { background: var(--expense); }
+
+/* 记录项分类图标 */
+.record-item .cat-icon { margin-right: 6px; }
+
+/* 记录头部操作区 */
+.records-actions { display: flex; align-items: center; gap: 10px; }
+.ghost-btn {
+  padding: 6px 12px; border: 1px solid var(--border); background: var(--card);
+  border-radius: 8px; font-size: 0.8rem; cursor: pointer; color: var(--teal-dark);
+}
+.ghost-btn:active { background: var(--bg); }
+
+/* 统计图表 */
+.charts { margin-bottom: 22px; }
+.month-select {
+  padding: 6px 10px; border: 1px solid var(--border); border-radius: 8px;
+  background: var(--card); font-size: 0.82rem; color: var(--text);
+}
+.chart-block {
+  background: var(--card); border-radius: 14px; padding: 14px 16px;
+  box-shadow: var(--shadow); margin-bottom: 12px;
+}
+.chart-title { font-size: 0.9rem; font-weight: 600; color: var(--muted); margin-bottom: 14px; }
+
+.monthly-chart { display: flex; align-items: flex-end; gap: 8px; height: 140px; }
+.bar-col { flex: 1; display: flex; flex-direction: column; align-items: center; height: 100%; }
+.bar-col .bars { flex: 1; width: 100%; display: flex; align-items: flex-end; justify-content: center; gap: 3px; }
+.bar { width: 38%; min-height: 2px; border-radius: 4px 4px 0 0; transition: height 0.3s ease; }
+.bar.income { background: var(--income); }
+.bar.expense { background: var(--expense); }
+.bar-label { font-size: 0.72rem; color: var(--muted); margin-top: 6px; }
+
+.category-chart { display: flex; flex-direction: column; gap: 10px; }
+.cat-row { display: grid; grid-template-columns: 72px 1fr auto; align-items: center; gap: 8px; }
+.cat-row .cat-name { font-size: 0.82rem; }
+.cat-bar-wrap { background: var(--bg); border-radius: 6px; height: 14px; overflow: hidden; }
+.cat-bar { height: 100%; border-radius: 6px; transition: width 0.3s ease; }
+.cat-row .cat-amt { font-size: 0.74rem; color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.chart-empty { color: var(--muted); font-size: 0.85rem; text-align: center; padding: 10px 0; }
+
+/* 云同步面板 */
+.sync-panel { margin-bottom: 24px; }
+.sync-panel details {
+  background: var(--card); border-radius: 14px; padding: 4px 16px; box-shadow: var(--shadow);
+}
+.sync-panel summary { cursor: pointer; padding: 12px 0; font-weight: 500; color: var(--teal-dark); }
+.sync-status { font-size: 0.76rem; color: var(--muted); font-weight: 400; }
+.sync-form { padding: 8px 0 16px; display: flex; flex-direction: column; gap: 14px; }
+.sync-tip { font-size: 0.8rem; color: var(--muted); line-height: 1.5; }
+.sync-form .field { display: flex; flex-direction: column; gap: 6px; }
+.sync-form .field label { font-size: 0.82rem; color: var(--muted); }
+.sync-form input[type="url"], .sync-form input[type="text"] {
+  padding: 11px 12px; border: 1px solid var(--border); border-radius: 10px; font-size: 1rem;
+}
+.sync-form input:focus { outline: none; border-color: var(--teal); }
+.checkbox-row { display: flex; align-items: center; gap: 8px; font-size: 0.9rem; cursor: pointer; }
+.sync-buttons { display: flex; gap: 10px; }
+.sync-buttons .ghost-btn, .sync-buttons .primary-btn { flex: 1; padding: 11px; }

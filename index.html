@@ -37,7 +37,7 @@
         <span class="mic-icon">🎤</span>
         <span id="micLabel">按住或点击说话</span>
       </button>
-      <p id="voiceHint" class="voice-hint">例如：“午餐 35 元”、“收到工资 8000 元”、“打车 22 块”</p>
+      <p id="voiceHint" class="voice-hint">例如：“15号 午餐 35 元”、“昨天打车 22 块”、“收到工资 8000 元”</p>
       <p id="transcript" class="transcript" aria-live="polite"></p>
     </section>
 
@@ -66,23 +66,70 @@
       </details>
     </section>
 
+    <!-- 统计图表 -->
+    <section class="charts">
+      <div class="records-header">
+        <h2>统计</h2>
+        <select id="chartMonth" class="month-select" aria-label="选择月份"></select>
+      </div>
+      <div class="chart-block">
+        <h3 class="chart-title">近 6 个月收支</h3>
+        <div id="monthlyChart" class="monthly-chart"></div>
+      </div>
+      <div class="chart-block">
+        <h3 class="chart-title">本月支出分类</h3>
+        <div id="categoryChart" class="category-chart"></div>
+      </div>
+    </section>
+
     <!-- 记录列表 -->
     <section class="records">
       <div class="records-header">
         <h2>记录</h2>
-        <div class="filters" role="tablist">
-          <button class="filter-btn active" data-filter="all">全部</button>
-          <button class="filter-btn" data-filter="income">收入</button>
-          <button class="filter-btn" data-filter="expense">支出</button>
+        <div class="records-actions">
+          <button id="exportBtn" class="ghost-btn" title="导出 CSV">⬇ 导出</button>
+          <div class="filters" role="tablist">
+            <button class="filter-btn active" data-filter="all">全部</button>
+            <button class="filter-btn" data-filter="income">收入</button>
+            <button class="filter-btn" data-filter="expense">支出</button>
+          </div>
         </div>
       </div>
       <ul id="recordList" class="record-list"></ul>
       <p id="emptyState" class="empty-state">还没有记录，点击上方麦克风开始记账。</p>
     </section>
+
+    <!-- 云同步 -->
+    <section class="sync-panel">
+      <details>
+        <summary>☁️ 云同步 / 多设备 <span id="syncStatus" class="sync-status"></span></summary>
+        <div class="sync-form">
+          <p class="sync-tip">填写同步服务器地址与同步码后，可在多台设备间同步账单。同步码相同的设备共享同一份数据。</p>
+          <div class="field">
+            <label for="syncUrl">服务器地址</label>
+            <input id="syncUrl" type="url" placeholder="https://app.b2bsxlj.com/api" />
+          </div>
+          <div class="field">
+            <label for="syncAccount">同步码（自定义口令）</label>
+            <input id="syncAccount" type="text" placeholder="如：myfamily-2026" autocomplete="off" />
+          </div>
+          <label class="checkbox-row">
+            <input id="autoSync" type="checkbox" /> 录入后自动同步
+          </label>
+          <div class="sync-buttons">
+            <button id="saveSyncBtn" class="ghost-btn">保存设置</button>
+            <button id="syncNowBtn" class="primary-btn">立即同步</button>
+          </div>
+        </div>
+      </details>
+    </section>
   </main>
 
   <div id="toast" class="toast" role="status" aria-live="assertive"></div>
 
+  <script src="categories.js"></script>
+  <script src="charts.js"></script>
+  <script src="sync.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

@@ -1,0 +1,13 @@
+{
+  "name": "voice-finance-sync-server",
+  "version": "1.0.0",
+  "description": "语音记账云同步后端（零依赖）",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "license": "MIT"
+}
