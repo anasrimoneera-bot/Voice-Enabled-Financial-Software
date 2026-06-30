@@ -277,17 +277,26 @@ function exportCsv() {
     showToast('暂无记录可导出', true);
     return;
   }
-  const header = ['日期时间', '类型', '分类', '摘要', '金额'];
+  // 固定的财务流水表列名与顺序，不可更改
+  const header = ['日期', '流水号', '摘要', '账户对方科目', '辅助核算', '对方户名', '对方账号', '对方银行', '收入', '支出', '备注', '类别'];
   const lines = rows
     .slice()
     .sort((a, b) => a.time.localeCompare(b.time))
-    .map((r) => [
-      new Date(r.time).toLocaleString('zh-CN'),
-      r.type === 'income' ? '收入' : '支出',
-      r.group || '其他',
-      r.summary,
-      r.amount.toFixed(2),
-    ]);
+    .map((r, i) => {
+      const d = new Date(r.time);
+      const date = `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}`;
+      const amt = String(r.amount); // 保持与样表一致（如 1500、589.3、163.09）
+      return [
+        date,
+        i + 1,                                 // 流水号
+        r.summary,                             // 摘要
+        '', '', '', '', '',                    // 账户对方科目 / 辅助核算 / 对方户名 / 对方账号 / 对方银行
+        r.type === 'income' ? amt : '',        // 收入
+        r.type === 'expense' ? amt : '',       // 支出
+        '',                                    // 备注
+        r.group || '',                         // 类别
+      ];
+    });
   const csv = [header, ...lines]
     .map((cols) => cols.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(','))
     .join('\r\n');
