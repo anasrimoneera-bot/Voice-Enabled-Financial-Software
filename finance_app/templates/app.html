@@ -1190,10 +1190,30 @@ document.getElementById('lock-confirm').onclick = async () => {
   }
 };
 
+// 默认月份：落在“最近一个未锁定、且不晚于当前自然月”的月份。
+// 即：没有手动锁账跳转下个月时，不自动跳到新的空月份，而停在上一个未锁账的月份。
+// 若历史月份都已锁定或无数据，则用当前自然月。
+async function pickInitialMonth() {
+  try {
+    const data = await api('/api/months_overview?book_code=' + encodeURIComponent(currentBook));
+    if (!data || !data.ok || !Array.isArray(data.months)) return;
+    const curYm = ymStr(currentView);  // 当前自然月
+    const unlocked = data.months
+      .filter(m => !m.locked && m.year_month <= curYm)
+      .map(m => m.year_month)
+      .sort();
+    if (unlocked.length) {
+      const [y, mo] = unlocked[unlocked.length - 1].split('-');  // 最近一个未锁定月
+      currentView = { year: parseInt(y, 10), month: parseInt(mo, 10) };
+    }
+  } catch (e) { /* 出错则保持当前自然月 */ }
+}
+
 // ============ 初始化 ============
 (async function init() {
   await loadMyBooks();
   await loadCategories();
+  await pickInitialMonth();
   await loadEntries();
   connectSSE();
 })();
