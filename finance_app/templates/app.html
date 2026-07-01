@@ -1,0 +1,1202 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="语音记账">
+<meta name="theme-color" content="#ffffff">
+<title>财务语音记账</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💰</text></svg>">
+<style>
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif; background: #f5f5f7; color: #1d1d1f; -webkit-font-smoothing: antialiased; overscroll-behavior-y: none; }
+body { padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom); min-height: 100vh; }
+.app { max-width: 480px; margin: 0 auto; padding: 12px; padding-bottom: 240px; }
+.header { display: flex; justify-content: space-between; align-items: center; padding: 12px 4px 16px; }
+.header h1 { font-size: 18px; margin: 0; font-weight: 600; }
+.header .user-tag { font-size: 12px; color: #86868b; margin-top: 2px; }
+.icon-btn { background: none; border: none; padding: 8px; font-size: 20px; cursor: pointer; color: #1d1d1f; }
+.card { background: #fff; border-radius: 14px; padding: 16px; margin-bottom: 12px; box-shadow: 0 1px 2px rgba(0,0,0,0.04); }
+.summary { display: flex; gap: 12px; }
+.summary-item { flex: 1; }
+.summary-label { font-size: 12px; color: #86868b; margin: 0 0 4px; }
+.summary-value { font-size: 22px; font-weight: 600; margin: 0; }
+.income { color: #00875a; }
+.expense { color: #d92d20; }
+.entries { margin-bottom: 12px; }
+.entry { background: #fff; border-radius: 12px; padding: 14px 16px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: flex-start; box-shadow: 0 1px 2px rgba(0,0,0,0.04); }
+.entry-info { flex: 1; min-width: 0; }
+.entry-title { font-size: 15px; font-weight: 500; margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.entry-meta { font-size: 11px; color: #86868b; margin: 3px 0 0; }
+.entry-amount { font-size: 16px; font-weight: 600; margin: 0 0 0 12px; white-space: nowrap; }
+.entry-actions { display: flex; gap: 12px; margin-top: 8px; }
+.entry-actions button { background: none; border: none; font-size: 12px; color: #007aff; padding: 0; cursor: pointer; }
+.entry-actions button.danger { color: #d92d20; }
+.empty { text-align: center; padding: 40px 20px; color: #86868b; }
+.empty-icon { font-size: 40px; margin-bottom: 8px; opacity: 0.4; }
+.mic-area { position: fixed; bottom: 0; left: 0; right: 0; background: linear-gradient(180deg, rgba(245,245,247,0) 0%, rgba(245,245,247,0.95) 25%, rgba(245,245,247,1) 50%); padding: 40px 16px calc(20px + env(safe-area-inset-bottom)); display: flex; flex-direction: column; align-items: center; pointer-events: none; z-index: 50; }
+.mic-area > * { pointer-events: auto; }
+.mic-hint { font-size: 12px; color: #86868b; margin: 0 0 12px; min-height: 16px; text-align: center; max-width: 320px; }
+.mic-btn { width: 84px; height: 84px; border-radius: 50%; background: #007aff; border: none; color: #fff; font-size: 36px; cursor: pointer; box-shadow: 0 4px 16px rgba(0,122,255,0.35); transition: all 0.15s; display: flex; align-items: center; justify-content: center; user-select: none; -webkit-user-select: none; }
+.mic-btn:active, .mic-btn.recording { background: #d92d20; transform: scale(1.08); box-shadow: 0 4px 24px rgba(217,45,32,0.5); }
+.mic-btn:disabled { background: #c7c7cc; box-shadow: none; }
+.action-row { display: flex; gap: 8px; margin: 0 0 12px; flex-wrap: wrap; }
+.action-row button { flex: 1; min-width: 100px; padding: 12px; background: #fff; border: none; border-radius: 12px; font-size: 13px; font-weight: 500; cursor: pointer; box-shadow: 0 1px 2px rgba(0,0,0,0.04); color: #1d1d1f; }
+.action-row button:active { background: #f0f0f3; }
+.filter-row { display: flex; gap: 8px; margin: 0 0 12px; }
+.chip { padding: 6px 14px; background: #fff; border: none; border-radius: 999px; font-size: 13px; cursor: pointer; color: #1d1d1f; box-shadow: 0 1px 2px rgba(0,0,0,0.04); }
+.chip.active { background: #007aff; color: #fff; }
+.modal-bg { position: fixed; inset: 0; background: rgba(0,0,0,0.4); display: none; align-items: center; justify-content: center; z-index: 100; padding: 16px; }
+.modal-bg.show { display: flex; }
+.modal { background: #fff; border-radius: 16px; padding: 20px; width: 100%; max-width: 400px; max-height: 90vh; overflow-y: auto; }
+.modal h2 { margin: 0 0 16px; font-size: 18px; }
+.modal label { display: block; font-size: 13px; color: #86868b; margin: 12px 0 4px; }
+.modal input, .modal select, .modal textarea { width: 100%; padding: 10px 12px; border: 1px solid #d2d2d7; border-radius: 8px; font-size: 15px; font-family: inherit; background: #fff; }
+.modal textarea { min-height: 60px; resize: vertical; }
+.modal-actions { display: flex; gap: 8px; margin-top: 20px; }
+.modal-actions button { flex: 1; padding: 12px; border-radius: 10px; border: none; font-size: 15px; font-weight: 500; cursor: pointer; }
+.btn-primary { background: #007aff; color: #fff; }
+.btn-secondary { background: #f0f0f3; color: #1d1d1f; }
+.btn-danger { background: #d92d20; color: #fff; }
+.toast { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.85); color: #fff; padding: 10px 18px; border-radius: 8px; font-size: 14px; z-index: 200; opacity: 0; transition: opacity 0.2s; pointer-events: none; max-width: 90%; text-align: center; }
+.toast.show { opacity: 1; }
+.month-tag { font-size: 11px; padding: 3px 10px; background: #e8f5e9; color: #00875a; border-radius: 999px; font-weight: 500; }
+.confirm-card { background: #fff8e1; border: 1px solid #ffd54f; border-radius: 12px; padding: 14px; margin-bottom: 12px; }
+.confirm-card h3 { margin: 0 0 10px; font-size: 14px; color: #6d4c00; }
+.confirm-row { display: flex; justify-content: space-between; padding: 4px 0; font-size: 13px; gap: 12px; }
+.confirm-row .label { color: #86868b; flex-shrink: 0; }
+.confirm-row .val { text-align: right; word-break: break-all; }
+.confirm-card .modal-actions { margin-top: 12px; }
+.confirm-card .modal-actions button { padding: 10px; font-size: 14px; }
+.recording-text { font-size: 14px; color: #d92d20; font-weight: 500; }
+.processing { font-size: 13px; color: #007aff; }
+.creator-badge { display: inline-block; padding: 1px 6px; background: #eef4ff; color: #007aff; border-radius: 4px; font-size: 10px; margin-right: 4px; }
+.sse-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #ccc; margin-right: 4px; vertical-align: middle; }
+.sse-dot.connected { background: #00875a; animation: pulse 2s infinite; }
+@keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
+.day-group { margin-bottom: 12px; }
+.day-header { display: flex; justify-content: space-between; align-items: center; padding: 4px 4px 6px; }
+.day-header .date { font-size: 13px; font-weight: 600; color: #1d1d1f; }
+.day-header .day-total { font-size: 11px; color: #86868b; }
+.day-header .day-total .income { color: #00875a; }
+.day-header .day-total .expense { color: #d92d20; }
+.months-list { max-height: 60vh; overflow-y: auto; margin-top: 12px; }
+.month-item { display: flex; justify-content: space-between; align-items: center; padding: 12px 14px; background: #fff; border-radius: 10px; margin-bottom: 6px; cursor: pointer; box-shadow: 0 1px 2px rgba(0,0,0,0.04); }
+.month-item:active { background: #f0f0f3; }
+.month-item.current { border: 2px solid #007aff; }
+.month-item .ym { font-size: 14px; font-weight: 500; }
+.month-item .cnt { font-size: 11px; color: #86868b; }
+.month-item .nums { text-align: right; font-size: 12px; }
+.month-item .nums .inc { color: #00875a; }
+.month-item .nums .exp { color: #d92d20; }
+
+/* 搜索栏 */
+.search-bar { background: #fff; border-radius: 12px; padding: 10px 14px; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; box-shadow: 0 1px 2px rgba(0,0,0,0.04); }
+.search-bar input { flex: 1; border: none; outline: none; font-size: 15px; background: transparent; }
+.search-bar .clear-btn { background: none; border: none; padding: 4px 8px; color: #86868b; cursor: pointer; font-size: 18px; line-height: 1; }
+.search-bar .filter-btn { background: none; border: none; padding: 4px 8px; color: #007aff; cursor: pointer; font-size: 14px; font-weight: 500; }
+.search-bar .filter-btn.active { background: #eef4ff; border-radius: 6px; }
+.search-status { background: #fff8e1; border: 1px solid #ffd54f; border-radius: 10px; padding: 10px 14px; margin-bottom: 12px; font-size: 13px; display: flex; justify-content: space-between; align-items: center; }
+.search-status .clear-search { background: none; border: none; color: #007aff; cursor: pointer; font-size: 13px; padding: 4px 8px; }
+.adv-filter-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.adv-filter-grid > div { margin: 0; }
+</style>
+</head>
+<body>
+<div class="app">
+
+<div class="header">
+  <div>
+    <h1>💰 财务记账</h1>
+    <div class="user-tag"><span class="sse-dot" id="sse-dot"></span>{{ display_name }} {% if is_admin %}<span style="color:#007aff;">· 管理员</span>{% endif %}</div>
+  </div>
+  <div>
+    <button class="icon-btn" id="btn-book" title="切换账套">🏢</button>
+    <button class="icon-btn" id="btn-month" title="切换月份">📅</button>
+    <button class="icon-btn" onclick="location.href='/reports'" title="报表">📊</button>
+    {% if is_admin %}<button class="icon-btn" onclick="location.href='/admin'" title="管理后台">⚙️</button>{% endif %}
+    <button class="icon-btn" id="btn-menu" title="菜单">☰</button>
+  </div>
+</div>
+
+<div class="card">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+    <div>
+      <span style="font-size:13px;color:#86868b;" id="month-label">本月流水</span>
+      <span id="book-label" style="font-size:11px;color:#007aff;background:#eef4ff;padding:2px 8px;border-radius:999px;margin-left:6px;">默认账套</span>
+    </div>
+    <div>
+      <span class="month-tag" id="count-label">0 笔</span>
+      <button class="icon-btn" id="btn-lock" title="锁定/解锁" style="padding:2px 6px;font-size:16px;display:none;">🔓</button>
+    </div>
+  </div>
+  <div class="summary">
+    <div class="summary-item"><p class="summary-label">收入</p><p class="summary-value income" id="total-income">¥0</p></div>
+    <div class="summary-item"><p class="summary-label">支出</p><p class="summary-value expense" id="total-expense">¥0</p></div>
+  </div>
+  <div id="lock-banner" style="display:none;margin-top:10px;padding:8px 10px;background:#fff8e1;border:1px solid #ffd54f;border-radius:8px;font-size:12px;color:#6d4c00;">
+    🔒 <span id="lock-banner-text"></span>
+  </div>
+</div>
+
+<div id="confirm-area"></div>
+
+<div class="action-row">
+  <button id="btn-export">📥 导出本月Excel</button>
+  <button id="btn-manual">✏️ 手动添加</button>
+</div>
+
+<div class="filter-row" id="filter-row">
+  <button class="chip active" data-filter="all">全部</button>
+  <button class="chip" data-filter="mine">只看我录的</button>
+</div>
+
+<div class="search-bar">
+  <span style="color:#86868b;font-size:16px;">🔍</span>
+  <input type="text" id="search-input" placeholder="搜索摘要、备注..." autocomplete="off">
+  <button class="clear-btn" id="search-clear" style="display:none;">×</button>
+  <button class="filter-btn" id="btn-adv-filter" title="高级筛选">筛选</button>
+</div>
+
+<div id="search-status-area"></div>
+
+<div class="entries" id="entries-list"></div>
+
+</div>
+
+<div class="mic-area">
+  <p class="mic-hint" id="mic-hint">按住说话录入流水</p>
+  <button class="mic-btn" id="mic-btn">🎤</button>
+</div>
+
+<!-- 编辑弹窗 -->
+<div class="modal-bg" id="modal-edit">
+<div class="modal">
+  <h2 id="edit-title">添加流水</h2>
+  <label>日期</label>
+  <input type="date" id="edit-date">
+  <label>摘要</label>
+  <input type="text" id="edit-summary" placeholder="如：午饭">
+  <label>类型</label>
+  <select id="edit-type">
+    <option value="expense">支出</option>
+    <option value="income">收入</option>
+  </select>
+  <label>类别</label>
+  <select id="edit-category"><option value="">（无）</option></select>
+  <label>金额（元）</label>
+  <input type="number" id="edit-amount" inputmode="decimal" step="0.01" placeholder="0.00">
+  <label>备注（可选）</label>
+  <input type="text" id="edit-remark" placeholder="">
+  <div class="modal-actions">
+    <button class="btn-secondary" id="edit-cancel">取消</button>
+    <button class="btn-primary" id="edit-save">保存</button>
+  </div>
+</div>
+</div>
+
+<!-- 账套切换弹窗 -->
+<div class="modal-bg" id="modal-book">
+<div class="modal">
+  <h2>🏢 切换账套</h2>
+  <div id="books-list" style="margin-top:12px;">加载中...</div>
+  <div class="modal-actions">
+    <button class="btn-secondary" onclick="closeModal('modal-book')">关闭</button>
+  </div>
+</div>
+</div>
+
+<!-- 锁定操作弹窗（admin） -->
+<div class="modal-bg" id="modal-lock">
+<div class="modal">
+  <h2 id="lock-modal-title">锁定月份</h2>
+  <p id="lock-modal-desc" style="font-size:13px;color:#86868b;margin:8px 0;"></p>
+  <label>备注（可选）</label>
+  <input type="text" id="lock-note" placeholder="如：3月已对账，禁止修改">
+  <div class="modal-actions">
+    <button class="btn-secondary" onclick="closeModal('modal-lock')">取消</button>
+    <button class="btn-primary" id="lock-confirm">确定</button>
+  </div>
+</div>
+</div>
+
+<!-- 月份选择/概览弹窗 -->
+<div class="modal-bg" id="modal-month">
+<div class="modal">
+  <h2>📅 月份切换</h2>
+  <label>选择具体月份</label>
+  <input type="month" id="month-picker">
+  <div class="modal-actions">
+    <button class="btn-secondary" id="month-cancel">取消</button>
+    <button class="btn-primary" id="month-confirm">跳转</button>
+  </div>
+  <label style="margin-top:20px;">📊 历史月份（点击直接跳转）</label>
+  <div class="months-list" id="months-list">加载中...</div>
+</div>
+</div>
+
+<!-- 菜单弹窗 -->
+<div class="modal-bg" id="modal-menu">
+<div class="modal">
+  <h2>菜单</h2>
+  <div style="display:flex;flex-direction:column;gap:8px;margin-top:12px;">
+    <button class="btn-secondary" onclick="openChangePwd()" style="padding:14px;border-radius:10px;border:none;font-size:15px;cursor:pointer;">🔑 修改密码</button>
+    <button class="btn-secondary" onclick="exportWithCreator()" style="padding:14px;border-radius:10px;border:none;font-size:15px;cursor:pointer;">📥 导出（含录入人列）</button>
+    <button class="btn-danger" onclick="doLogout()" style="padding:14px;border-radius:10px;border:none;font-size:15px;cursor:pointer;">退出登录</button>
+  </div>
+  <div class="modal-actions">
+    <button class="btn-secondary" onclick="closeModal('modal-menu')">关闭</button>
+  </div>
+</div>
+</div>
+
+<!-- 高级筛选弹窗 -->
+<div class="modal-bg" id="modal-adv-filter">
+<div class="modal">
+  <h2>🔍 高级筛选</h2>
+  <label>关键字（摘要 / 备注 / 语音原文）</label>
+  <input type="text" id="adv-q" placeholder="如：物业费">
+  <div class="adv-filter-grid">
+    <div>
+      <label>起始日期</label>
+      <input type="date" id="adv-date-from">
+    </div>
+    <div>
+      <label>截止日期</label>
+      <input type="date" id="adv-date-to">
+    </div>
+  </div>
+  <label>类型</label>
+  <select id="adv-type">
+    <option value="">不限</option>
+    <option value="income">收入</option>
+    <option value="expense">支出</option>
+  </select>
+  <div class="adv-filter-grid">
+    <div>
+      <label>最小金额</label>
+      <input type="number" id="adv-amount-min" inputmode="decimal" step="0.01" placeholder="例如 100">
+    </div>
+    <div>
+      <label>最大金额</label>
+      <input type="number" id="adv-amount-max" inputmode="decimal" step="0.01" placeholder="例如 5000">
+    </div>
+  </div>
+  <p style="font-size:12px;color:#86868b;margin:12px 0 0;">应用高级筛选时，月份切换会失效，搜索范围跨所有历史月份</p>
+  <div class="modal-actions">
+    <button class="btn-secondary" onclick="closeModal('modal-adv-filter')">取消</button>
+    <button class="btn-secondary" onclick="clearAdvFilter()">清空</button>
+    <button class="btn-primary" onclick="applyAdvFilter()">应用</button>
+  </div>
+</div>
+</div>
+
+<!-- 修改密码弹窗 -->
+<div class="modal-bg" id="modal-pwd">
+<div class="modal">
+  <h2>修改密码</h2>
+  <label>原密码</label>
+  <input type="password" id="old-pwd">
+  <label>新密码（至少6位）</label>
+  <input type="password" id="new-pwd">
+  <div class="modal-actions">
+    <button class="btn-secondary" onclick="closeModal('modal-pwd')">取消</button>
+    <button class="btn-primary" onclick="doChangePwd()">保存</button>
+  </div>
+</div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+'use strict';
+
+const ME = {
+  username: {{ username|tojson }},
+  display_name: {{ display_name|tojson }},
+  is_admin: {{ is_admin|tojson }}
+};
+
+// 账套：从 localStorage 读取上次选择
+let currentBook = localStorage.getItem('finance_current_book') || 'default';
+let myBooks = [];  // 当前用户可访问的账套列表
+let categoriesCache = [];  // 当前账套的类别列表
+let currentLockInfo = {locked: false};  // 当前月份锁定状态
+
+let currentView = (() => {
+  const d = new Date();
+  return {year: d.getFullYear(), month: d.getMonth()+1};
+})();
+let currentFilter = 'all';  // all / mine
+let entriesCache = [];
+
+// 搜索状态
+let searchState = {
+  q: '',
+  date_from: '',
+  date_to: '',
+  type: '',
+  amount_min: '',
+  amount_max: '',
+};
+function hasSearch() {
+  return !!(searchState.q || searchState.date_from || searchState.date_to ||
+            searchState.type || searchState.amount_min || searchState.amount_max);
+}
+
+// ============ 工具 ============
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(t._tm);
+  t._tm = setTimeout(()=>t.classList.remove('show'), 2000);
+}
+function fmtMoney(n) {
+  n = Number(n) || 0;
+  return '¥' + n.toLocaleString('zh-CN', {minimumFractionDigits: n%1?2:0, maximumFractionDigits:2});
+}
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]);
+}
+function ymStr(view) { return `${view.year}-${String(view.month).padStart(2,'0')}`; }
+function todayInputStr() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+function closeModal(id) { document.getElementById(id).classList.remove('show'); }
+
+async function api(path, opts={}) {
+  opts.headers = Object.assign({'Content-Type':'application/json'}, opts.headers||{});
+  opts.credentials = 'same-origin';
+  const r = await fetch(path, opts);
+  if (r.status === 401) { location.href = '/login'; return null; }
+  return r.json();
+}
+
+// ============ 加载流水 ============
+async function loadEntries() {
+  const params = new URLSearchParams();
+  params.set('book_code', currentBook);
+  if (hasSearch()) {
+    if (searchState.q) params.set('q', searchState.q);
+    if (searchState.date_from) params.set('date_from', searchState.date_from);
+    if (searchState.date_to) params.set('date_to', searchState.date_to);
+    if (searchState.type) params.set('type', searchState.type);
+    if (searchState.amount_min) params.set('amount_min', searchState.amount_min);
+    if (searchState.amount_max) params.set('amount_max', searchState.amount_max);
+  } else {
+    params.set('year_month', ymStr(currentView));
+  }
+  if (currentFilter === 'mine') params.set('creator', ME.username);
+  const data = await api('/api/entries?' + params.toString());
+  if (!data || !data.ok) {
+    toast(data && data.error || '加载失败');
+    return;
+  }
+  entriesCache = data.entries;
+  currentLockInfo = data.lock_info || {locked: false};
+  updateLockUI();
+  render(data.summary);
+  renderSearchStatus(data.summary);
+}
+
+function updateLockUI() {
+  // 更新月份卡片上的锁定按钮和提示
+  const btn = document.getElementById('btn-lock');
+  const banner = document.getElementById('lock-banner');
+  const bannerText = document.getElementById('lock-banner-text');
+  if (hasSearch()) {
+    btn.style.display = 'none';
+    banner.style.display = 'none';
+    return;
+  }
+  if (currentLockInfo && currentLockInfo.locked) {
+    btn.textContent = '🔒';
+    btn.title = ME.is_admin ? '已锁定，点击解锁' : '已锁定（仅admin可解锁）';
+    btn.style.display = ME.is_admin ? 'inline-block' : 'inline-block';
+    btn.style.cursor = ME.is_admin ? 'pointer' : 'not-allowed';
+    banner.style.display = 'block';
+    bannerText.textContent = `本月已锁定 · ${currentLockInfo.locked_by_name} · ${currentLockInfo.locked_at}${currentLockInfo.note ? ' · ' + currentLockInfo.note : ''}`;
+  } else {
+    btn.textContent = '🔓';
+    btn.title = ME.is_admin ? '点击锁定本月' : '未锁定';
+    btn.style.display = ME.is_admin ? 'inline-block' : 'none';
+    btn.style.cursor = ME.is_admin ? 'pointer' : 'default';
+    banner.style.display = 'none';
+  }
+}
+
+function renderSearchStatus(summary) {
+  const area = document.getElementById('search-status-area');
+  if (!hasSearch()) { area.innerHTML = ''; return; }
+  const parts = [];
+  if (searchState.q) parts.push(`关键字「${escapeHtml(searchState.q)}」`);
+  if (searchState.date_from || searchState.date_to) {
+    parts.push(`日期 ${searchState.date_from || '∞'} 至 ${searchState.date_to || '∞'}`);
+  }
+  if (searchState.type) parts.push(searchState.type === 'income' ? '类型=收入' : '类型=支出');
+  if (searchState.amount_min || searchState.amount_max) {
+    parts.push(`金额 ¥${searchState.amount_min || 0}-${searchState.amount_max || '∞'}`);
+  }
+  area.innerHTML = `
+    <div class="search-status">
+      <span>🔍 ${escapeHtml(parts.join(' · '))} · <b>${summary.count}</b> 笔</span>
+      <div>
+        <button class="clear-search" onclick="exportSearchResult()" title="导出搜索结果">📥</button>
+        <button class="clear-search" onclick="clearAllSearch()">清除</button>
+      </div>
+    </div>
+  `;
+}
+
+function render(summary) {
+  if (hasSearch()) {
+    document.getElementById('month-label').textContent = '搜索结果';
+  } else {
+    document.getElementById('month-label').textContent = `${currentView.year}年${currentView.month}月`;
+  }
+  document.getElementById('count-label').textContent = `${summary.count} 笔`;
+  document.getElementById('total-income').textContent = fmtMoney(summary.income);
+  document.getElementById('total-expense').textContent = fmtMoney(summary.expense);
+
+  const list = document.getElementById('entries-list');
+  if (entriesCache.length === 0) {
+    if (hasSearch()) {
+      list.innerHTML = '<div class="empty"><div class="empty-icon">🔍</div><p>没有匹配的记录<br>试试更宽的条件</p></div>';
+    } else {
+      list.innerHTML = '<div class="empty"><div class="empty-icon">📋</div><p>本月还没有流水<br>按下方麦克风开始录入</p></div>';
+    }
+    return;
+  }
+
+  // 按日期分组（已经按 date DESC, created_at DESC 排过序）
+  const groups = {};
+  const order = [];
+  for (const e of entriesCache) {
+    if (!groups[e.date]) {
+      groups[e.date] = {entries: [], income: 0, expense: 0};
+      order.push(e.date);
+    }
+    groups[e.date].entries.push(e);
+    if (e.type === 'income') groups[e.date].income += e.amount;
+    else groups[e.date].expense += e.amount;
+  }
+
+  // 搜索时显示完整日期（年月日），否则只显示月日
+  const showFullDate = hasSearch();
+
+  list.innerHTML = order.map(date => {
+    const g = groups[date];
+    const [y, m, d] = date.split('/');
+    const dayLabel = showFullDate ? `${y}/${m}/${d}` : `${m}/${d}`;
+    const weekday = ['周日','周一','周二','周三','周四','周五','周六'][
+      new Date(date.replace(/\//g, '-')).getDay()
+    ] || '';
+    let totalHtml = '';
+    if (g.income > 0) totalHtml += `<span class="income">+${fmtMoney(g.income)}</span>`;
+    if (g.income > 0 && g.expense > 0) totalHtml += ' · ';
+    if (g.expense > 0) totalHtml += `<span class="expense">-${fmtMoney(g.expense)}</span>`;
+    const dayCount = g.entries.length;
+
+    const itemsHtml = g.entries.map(e => {
+      const canEdit = ((e.creator === ME.username) || ME.is_admin) && !currentLockInfo.locked && !hasSearch();
+      const isMine = e.creator === ME.username;
+      const metaParts = [];
+      if (!isMine) metaParts.push(`<span class="creator-badge">${escapeHtml(e.creator_name)}</span>`);
+      if (e.category) metaParts.push(`<span style="background:#f0f0f3;color:#666;padding:1px 6px;border-radius:4px;font-size:10px;margin-right:4px;">${escapeHtml(e.category)}</span>`);
+      if (e.remark) metaParts.push(escapeHtml(e.remark));
+      return `
+        <div class="entry" data-id="${e.id}">
+          <div class="entry-info">
+            <p class="entry-title">${escapeHtml(e.summary)}</p>
+            <p class="entry-meta">${metaParts.join(' ')}</p>
+            ${canEdit ? `
+            <div class="entry-actions">
+              <button onclick="editEntry(${e.id})">编辑</button>
+              <button class="danger" onclick="deleteEntry(${e.id})">删除</button>
+            </div>` : ''}
+          </div>
+          <p class="entry-amount ${e.type==='income'?'income':'expense'}">${e.type==='income'?'+':'-'}${fmtMoney(e.amount)}</p>
+        </div>
+      `;
+    }).join('');
+
+    return `
+      <div class="day-group">
+        <div class="day-header">
+          <span class="date">${dayLabel} <span style="color:#86868b;font-weight:400;">${weekday} · ${dayCount}笔</span></span>
+          <span class="day-total">${totalHtml}</span>
+        </div>
+        ${itemsHtml}
+      </div>
+    `;
+  }).join('');
+}
+
+window.editEntry = function(id) {
+  const e = entriesCache.find(x => x.id === id);
+  if (!e) return;
+  openEditModal(e);
+};
+
+window.deleteEntry = async function(id) {
+  if (!confirm('确定删除这笔流水吗？')) return;
+  const data = await api(`/api/entries/${id}`, {method:'DELETE'});
+  if (data && data.ok) { toast('已删除'); loadEntries(); }
+  else toast((data && data.error) || '删除失败');
+};
+
+// ============ 编辑弹窗 ============
+let editingId = null;
+
+function openEditModal(entry) {
+  editingId = entry ? entry.id : null;
+  document.getElementById('edit-title').textContent = entry && entry.id ? '编辑流水' : '添加流水';
+  let dateStr = todayInputStr();
+  if (entry && entry.date) {
+    const [y,m,d] = entry.date.split('/').map(Number);
+    dateStr = `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+  }
+  document.getElementById('edit-date').value = dateStr;
+  document.getElementById('edit-summary').value = (entry && entry.summary) || '';
+  document.getElementById('edit-type').value = (entry && entry.type) || 'expense';
+  document.getElementById('edit-amount').value = (entry && entry.amount) || '';
+  document.getElementById('edit-remark').value = (entry && entry.remark) || '';
+  // 填充类别下拉
+  const catSel = document.getElementById('edit-category');
+  catSel.innerHTML = '<option value="">（无）</option>' +
+    categoriesCache.map(c => `<option value="${escapeHtml(c.name)}">${escapeHtml(c.name)}</option>`).join('');
+  catSel.value = (entry && entry.category) || '';
+  document.getElementById('modal-edit').classList.add('show');
+}
+
+document.getElementById('btn-manual').onclick = () => {
+  if (currentLockInfo.locked) {
+    toast('本月已锁定，请管理员先解锁');
+    return;
+  }
+  openEditModal(null);
+};
+document.getElementById('edit-cancel').onclick = () => closeModal('modal-edit');
+document.getElementById('edit-save').onclick = async () => {
+  const dateVal = document.getElementById('edit-date').value;
+  const summary = document.getElementById('edit-summary').value.trim();
+  const type = document.getElementById('edit-type').value;
+  const category = document.getElementById('edit-category').value;
+  const amount = parseFloat(document.getElementById('edit-amount').value);
+  const remark = document.getElementById('edit-remark').value.trim();
+  if (!dateVal) { toast('请选择日期'); return; }
+  if (!summary) { toast('请填写摘要'); return; }
+  if (!amount || amount <= 0) { toast('请填写金额'); return; }
+  const [y,m,d] = dateVal.split('-').map(Number);
+  const date = `${y}/${m}/${d}`;
+  const payload = {date, summary, type, category, amount, remark, book_code: currentBook};
+
+  let data;
+  if (editingId) {
+    data = await api(`/api/entries/${editingId}`, {method:'PATCH', body: JSON.stringify(payload)});
+  } else {
+    data = await api('/api/entries', {method:'POST', body: JSON.stringify(payload)});
+  }
+  if (data && data.ok) {
+    closeModal('modal-edit');
+    toast('已保存');
+    currentView = {year:y, month:m};
+    loadEntries();
+  } else {
+    toast((data && data.error) || '保存失败');
+  }
+};
+
+// ============ 月份切换 ============
+document.getElementById('btn-month').onclick = async () => {
+  document.getElementById('month-picker').value = ymStr(currentView);
+  document.getElementById('modal-month').classList.add('show');
+  // 加载历史月份
+  const listDiv = document.getElementById('months-list');
+  listDiv.innerHTML = '<div style="text-align:center;padding:20px;color:#86868b;font-size:13px;">加载中...</div>';
+  const data = await api('/api/months_overview?book_code=' + encodeURIComponent(currentBook));
+  if (!data || !data.ok) { listDiv.innerHTML = '<div style="color:#86868b;font-size:13px;">加载失败</div>'; return; }
+  if (data.months.length === 0) {
+    listDiv.innerHTML = '<div style="color:#86868b;font-size:13px;padding:12px;text-align:center;">该账套还没有任何月份的数据</div>';
+    return;
+  }
+  const curYm = ymStr(currentView);
+  listDiv.innerHTML = data.months.map(m => {
+    const [y, mo] = m.year_month.split('-');
+    const isCurrent = m.year_month === curYm;
+    const lockMark = m.locked ? ' 🔒' : '';
+    return `
+      <div class="month-item ${isCurrent ? 'current' : ''}" onclick="jumpToMonth('${m.year_month}')">
+        <div>
+          <div class="ym">${y}年${parseInt(mo,10)}月${lockMark}</div>
+          <div class="cnt">${m.count} 笔</div>
+        </div>
+        <div class="nums">
+          ${m.income > 0 ? `<div class="inc">+${fmtMoney(m.income)}</div>` : ''}
+          ${m.expense > 0 ? `<div class="exp">-${fmtMoney(m.expense)}</div>` : ''}
+        </div>
+      </div>
+    `;
+  }).join('');
+};
+window.jumpToMonth = (ym) => {
+  const [y, m] = ym.split('-').map(Number);
+  currentView = {year: y, month: m};
+  closeModal('modal-month');
+  loadEntries();
+};
+document.getElementById('month-cancel').onclick = () => closeModal('modal-month');
+document.getElementById('month-confirm').onclick = () => {
+  const v = document.getElementById('month-picker').value;
+  if (v) {
+    const [y,m] = v.split('-').map(Number);
+    currentView = {year:y, month:m};
+  }
+  closeModal('modal-month');
+  loadEntries();
+};
+
+// ============ 筛选 ============
+document.getElementById('filter-row').addEventListener('click', (e) => {
+  if (e.target.classList.contains('chip')) {
+    document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+    e.target.classList.add('active');
+    currentFilter = e.target.dataset.filter;
+    loadEntries();
+  }
+});
+
+// ============ 搜索 ============
+const searchInput = document.getElementById('search-input');
+const searchClear = document.getElementById('search-clear');
+let searchDebounce = null;
+
+searchInput.addEventListener('input', () => {
+  const v = searchInput.value.trim();
+  searchClear.style.display = v ? 'block' : 'none';
+  clearTimeout(searchDebounce);
+  searchDebounce = setTimeout(() => {
+    searchState.q = v;
+    loadEntries();
+    updateFilterBtn();
+  }, 300);
+});
+searchClear.addEventListener('click', () => {
+  searchInput.value = '';
+  searchClear.style.display = 'none';
+  searchState.q = '';
+  loadEntries();
+  updateFilterBtn();
+});
+
+document.getElementById('btn-adv-filter').onclick = () => {
+  document.getElementById('adv-q').value = searchState.q;
+  document.getElementById('adv-date-from').value = searchState.date_from;
+  document.getElementById('adv-date-to').value = searchState.date_to;
+  document.getElementById('adv-type').value = searchState.type;
+  document.getElementById('adv-amount-min').value = searchState.amount_min;
+  document.getElementById('adv-amount-max').value = searchState.amount_max;
+  document.getElementById('modal-adv-filter').classList.add('show');
+};
+
+window.applyAdvFilter = function() {
+  searchState.q = document.getElementById('adv-q').value.trim();
+  const df = document.getElementById('adv-date-from').value;
+  const dt = document.getElementById('adv-date-to').value;
+  // 转换 YYYY-MM-DD → YYYY/M/D
+  searchState.date_from = df ? df.replace(/-/g,'/').replace(/\/0?/g,'/').replace(/^\//,df.split('-')[0]+'/') : '';
+  searchState.date_to = dt ? dt.replace(/-/g,'/').replace(/\/0?/g,'/').replace(/^\//,dt.split('-')[0]+'/') : '';
+  // 上面写法太绕，重新规整一下
+  searchState.date_from = df ? formatDateForApi(df) : '';
+  searchState.date_to = dt ? formatDateForApi(dt) : '';
+  searchState.type = document.getElementById('adv-type').value;
+  searchState.amount_min = document.getElementById('adv-amount-min').value.trim();
+  searchState.amount_max = document.getElementById('adv-amount-max').value.trim();
+  // 同步到搜索栏输入框
+  searchInput.value = searchState.q;
+  searchClear.style.display = searchState.q ? 'block' : 'none';
+  closeModal('modal-adv-filter');
+  loadEntries();
+  updateFilterBtn();
+};
+
+window.clearAdvFilter = function() {
+  document.getElementById('adv-q').value = '';
+  document.getElementById('adv-date-from').value = '';
+  document.getElementById('adv-date-to').value = '';
+  document.getElementById('adv-type').value = '';
+  document.getElementById('adv-amount-min').value = '';
+  document.getElementById('adv-amount-max').value = '';
+};
+
+window.clearAllSearch = function() {
+  searchState = {q:'', date_from:'', date_to:'', type:'', amount_min:'', amount_max:''};
+  searchInput.value = '';
+  searchClear.style.display = 'none';
+  loadEntries();
+  updateFilterBtn();
+};
+
+function formatDateForApi(yyyymmdd) {
+  // "2024-03-15" → "2024/3/15"
+  const [y, m, d] = yyyymmdd.split('-').map(Number);
+  return `${y}/${m}/${d}`;
+}
+
+function updateFilterBtn() {
+  const btn = document.getElementById('btn-adv-filter');
+  const hasAdv = searchState.date_from || searchState.date_to || searchState.type ||
+                 searchState.amount_min || searchState.amount_max;
+  if (hasAdv) btn.classList.add('active');
+  else btn.classList.remove('active');
+}
+
+window.exportSearchResult = async function() {
+  const params = new URLSearchParams();
+  params.set('book_code', currentBook);
+  if (searchState.q) params.set('q', searchState.q);
+  if (searchState.date_from) params.set('date_from', searchState.date_from);
+  if (searchState.date_to) params.set('date_to', searchState.date_to);
+  if (searchState.type) params.set('type', searchState.type);
+  if (searchState.amount_min) params.set('amount_min', searchState.amount_min);
+  if (searchState.amount_max) params.set('amount_max', searchState.amount_max);
+  params.set('include_creator', '1');
+  params.set('include_category', '1');
+  const url = '/api/export?' + params.toString();
+  try {
+    const r = await fetch(url, {method:'GET', credentials:'same-origin'});
+    if (!r.ok) {
+      const j = await r.json().catch(() => ({error:'导出失败'}));
+      toast(j.error || '导出失败');
+      return;
+    }
+    const blob = await r.blob();
+    const dispo = r.headers.get('Content-Disposition') || '';
+    let fname = `财务搜索结果.xlsx`;
+    const m = dispo.match(/filename\*=UTF-8''([^;]+)/);
+    if (m) { try { fname = decodeURIComponent(m[1]); } catch(e){} }
+    const blobUrl = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = blobUrl;
+    a.download = fname;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(blobUrl); }, 100);
+    toast('已导出 ' + fname);
+  } catch(e) {
+    toast('导出出错：' + e.message);
+  }
+};
+
+// ============ 导出 ============
+document.getElementById('btn-export').onclick = () => exportExcel(false);
+window.exportWithCreator = () => { closeModal('modal-menu'); exportExcel(true); };
+
+async function exportExcel(includeCreator) {
+  const params = new URLSearchParams({
+    book_code: currentBook,
+    year_month: ymStr(currentView)
+  });
+  if (includeCreator) params.set('include_creator', '1');
+  params.set('include_category', '1');
+  const url = '/api/export?' + params.toString();
+  try {
+    const headResp = await fetch(url, {method:'GET', credentials:'same-origin'});
+    if (!headResp.ok) {
+      const j = await headResp.json().catch(()=>({error:'导出失败'}));
+      toast(j.error || '导出失败');
+      return;
+    }
+    const blob = await headResp.blob();
+    const dispo = headResp.headers.get('Content-Disposition') || '';
+    let fname = `财务日记账_${currentView.year}年${String(currentView.month).padStart(2,'0')}月.xlsx`;
+    const m = dispo.match(/filename\*=UTF-8''([^;]+)/);
+    if (m) { try { fname = decodeURIComponent(m[1]); } catch(e){} }
+    const blobUrl = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = blobUrl;
+    a.download = fname;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(blobUrl); }, 100);
+    toast('已下载 ' + fname);
+  } catch(e) {
+    toast('导出出错：' + e.message);
+  }
+}
+
+// ============ 菜单 / 修改密码 / 退出 ============
+document.getElementById('btn-menu').onclick = () => document.getElementById('modal-menu').classList.add('show');
+window.openChangePwd = function() {
+  closeModal('modal-menu');
+  document.getElementById('old-pwd').value = '';
+  document.getElementById('new-pwd').value = '';
+  document.getElementById('modal-pwd').classList.add('show');
+};
+window.doChangePwd = async function() {
+  const oldPwd = document.getElementById('old-pwd').value;
+  const newPwd = document.getElementById('new-pwd').value;
+  if (newPwd.length < 6) { toast('新密码至少 6 位'); return; }
+  const data = await api('/api/change_password', {
+    method:'POST', body: JSON.stringify({old_password: oldPwd, new_password: newPwd})
+  });
+  if (data && data.ok) { toast('已修改'); closeModal('modal-pwd'); }
+  else toast((data && data.error) || '修改失败');
+};
+window.doLogout = async function() {
+  await api('/api/logout', {method:'POST'});
+  location.href = '/login';
+};
+
+// ============ 模态框背景点击关闭 ============
+document.querySelectorAll('.modal-bg').forEach(bg => {
+  bg.addEventListener('click', (e) => {
+    if (e.target === bg) bg.classList.remove('show');
+  });
+});
+
+// ============ 语音录入（录音 → 火山 ASR → 解析） ============
+const micBtn = document.getElementById('mic-btn');
+const micHint = document.getElementById('mic-hint');
+
+let isRecording = false;
+let audioCtx = null;
+let mediaStream = null;
+let procNode = null;
+let srcNode = null;
+let pcmChunks = [];
+let recSampleRate = 16000;
+
+const HAS_MEDIA = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia &&
+  (window.AudioContext || window.webkitAudioContext));
+if (!HAS_MEDIA) {
+  micHint.textContent = '⚠️ 当前浏览器不支持录音，请用 Chrome/Safari';
+  micBtn.disabled = true;
+}
+
+async function startRecording() {
+  if (isRecording || !HAS_MEDIA) return;
+  try {
+    mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  } catch (e) {
+    micHint.textContent = '麦克风未授权，请允许麦克风权限';
+    return;
+  }
+  isRecording = true;
+  pcmChunks = [];
+  micBtn.classList.add('recording');
+  micHint.innerHTML = '<span class="recording-text">🔴 录音中…</span>';
+  const AC = window.AudioContext || window.webkitAudioContext;
+  audioCtx = new AC();
+  recSampleRate = audioCtx.sampleRate;
+  srcNode = audioCtx.createMediaStreamSource(mediaStream);
+  procNode = audioCtx.createScriptProcessor(4096, 1, 1);
+  procNode.onaudioprocess = (ev) => {
+    if (!isRecording) return;
+    pcmChunks.push(new Float32Array(ev.inputBuffer.getChannelData(0)));
+  };
+  srcNode.connect(procNode);
+  procNode.connect(audioCtx.destination);
+}
+
+function _cleanupAudio() {
+  try { if (procNode) procNode.disconnect(); } catch (e) {}
+  try { if (srcNode) srcNode.disconnect(); } catch (e) {}
+  try { if (mediaStream) mediaStream.getTracks().forEach((t) => t.stop()); } catch (e) {}
+  try { if (audioCtx) audioCtx.close(); } catch (e) {}
+  procNode = srcNode = mediaStream = audioCtx = null;
+}
+
+// 合并 PCM + 降采样到 16k + 编码为 16bit 单声道 WAV
+function _encodeWav(chunks, inRate) {
+  let len = 0;
+  chunks.forEach((c) => { len += c.length; });
+  const flat = new Float32Array(len);
+  let off = 0;
+  chunks.forEach((c) => { flat.set(c, off); off += c.length; });
+  const outRate = 16000;
+  let samples;
+  if (inRate === outRate) {
+    samples = flat;
+  } else {
+    const ratio = inRate / outRate;
+    const outLen = Math.floor(flat.length / ratio);
+    samples = new Float32Array(outLen);
+    for (let i = 0; i < outLen; i++) samples[i] = flat[Math.floor(i * ratio)];
+  }
+  const buf = new ArrayBuffer(44 + samples.length * 2);
+  const view = new DataView(buf);
+  const wr = (o, s) => { for (let i = 0; i < s.length; i++) view.setUint8(o + i, s.charCodeAt(i)); };
+  wr(0, 'RIFF');
+  view.setUint32(4, 36 + samples.length * 2, true);
+  wr(8, 'WAVE');
+  wr(12, 'fmt ');
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true);
+  view.setUint16(22, 1, true);
+  view.setUint32(24, outRate, true);
+  view.setUint32(28, outRate * 2, true);
+  view.setUint16(32, 2, true);
+  view.setUint16(34, 16, true);
+  wr(36, 'data');
+  view.setUint32(40, samples.length * 2, true);
+  let o = 44;
+  for (let i = 0; i < samples.length; i++) {
+    let s = Math.max(-1, Math.min(1, samples[i]));
+    view.setInt16(o, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+    o += 2;
+  }
+  return new Blob([view], { type: 'audio/wav' });
+}
+
+async function stopRecording() {
+  if (!isRecording) return;
+  isRecording = false;
+  micBtn.classList.remove('recording');
+  const chunks = pcmChunks;
+  const inRate = recSampleRate;
+  _cleanupAudio();
+  if (!chunks.length) { micHint.textContent = '按住说话录入流水'; return; }
+  const wav = _encodeWav(chunks, inRate);
+  if (wav.size < 2000) { micHint.textContent = '按住说话录入流水'; return; }
+  micHint.innerHTML = '<span class="processing">正在识别…</span>';
+  try {
+    const asrResp = await fetch('/api/asr?format=wav', {
+      method: 'POST',
+      headers: { 'Content-Type': 'audio/wav' },
+      body: wav,
+    });
+    const asr = await asrResp.json();
+    if (!asr || !asr.ok || !asr.text) {
+      toast((asr && asr.error) || '没有识别到内容');
+      micHint.textContent = '按住说话录入流水';
+      return;
+    }
+    const text = asr.text;
+    micHint.innerHTML = '<span class="processing">正在解析：“' + escapeHtml(text) + '”</span>';
+    const data = await api('/api/parse', { method: 'POST', body: JSON.stringify({ text, book_code: currentBook }) });
+    if (!data || !data.ok) {
+      toast((data && data.error) || '解析失败');
+      micHint.textContent = '按住说话录入流水';
+      return;
+    }
+    showConfirm(data.parsed, text, data.used);
+    micHint.textContent = '按住说话录入流水';
+  } catch (e) {
+    console.error(e);
+    micHint.textContent = '识别失败：' + e.message;
+    toast('识别失败：' + e.message);
+  }
+}
+
+// 待确认卡片
+let pendingEntry = null;
+function showConfirm(parsed, rawText, used) {
+  pendingEntry = {...parsed, raw_text: rawText};
+  const usedLabel = used === 'rule' ? '规则' : (used === 'deepseek' ? 'DeepSeek' : '通义千问');
+  const area = document.getElementById('confirm-area');
+  const catRow = parsed.category
+    ? `<div class="confirm-row"><span class="label">类别</span><span class="val">${escapeHtml(parsed.category)}</span></div>` : '';
+  area.innerHTML = `
+    <div class="confirm-card">
+      <h3>识别结果（${usedLabel}）· 请确认</h3>
+      <div class="confirm-row"><span class="label">原文</span><span class="val">${escapeHtml(rawText)}</span></div>
+      <div class="confirm-row"><span class="label">日期</span><span class="val">${parsed.date}</span></div>
+      <div class="confirm-row"><span class="label">摘要</span><span class="val">${escapeHtml(parsed.summary)}</span></div>
+      <div class="confirm-row"><span class="label">类型</span><span class="val">${parsed.type==='income'?'收入':'支出'}</span></div>
+      ${catRow}
+      <div class="confirm-row"><span class="label">金额</span><span class="val">${fmtMoney(parsed.amount)}</span></div>
+      <div class="modal-actions">
+        <button class="btn-secondary" onclick="cancelPending()">取消</button>
+        <button class="btn-secondary" onclick="editPending()">修改</button>
+        <button class="btn-primary" onclick="savePending()">保存</button>
+      </div>
+    </div>
+  `;
+}
+window.cancelPending = () => { pendingEntry = null; document.getElementById('confirm-area').innerHTML = ''; };
+window.editPending = () => {
+  if (!pendingEntry) return;
+  openEditModal({
+    id: null,
+    date: pendingEntry.date,
+    summary: pendingEntry.summary,
+    type: pendingEntry.type,
+    amount: pendingEntry.amount,
+    category: pendingEntry.category || '',
+    remark: ''
+  });
+  cancelPending();
+};
+window.savePending = async () => {
+  if (!pendingEntry) return;
+  if (!pendingEntry.amount || pendingEntry.amount <= 0) {
+    toast('金额无效，请编辑后保存');
+    return;
+  }
+  const data = await api('/api/entries', {method:'POST', body: JSON.stringify({
+    book_code: currentBook,
+    date: pendingEntry.date,
+    summary: pendingEntry.summary,
+    type: pendingEntry.type,
+    category: pendingEntry.category || '',
+    amount: pendingEntry.amount,
+    raw_text: pendingEntry.raw_text
+  })});
+  if (data && data.ok) {
+    cancelPending();
+    const [y,m] = pendingEntry.date.split('/').map(Number);
+    currentView = {year:y, month:m};
+    loadEntries();
+    toast('已保存');
+  } else {
+    toast((data && data.error) || '保存失败');
+  }
+};
+
+// 触摸/鼠标事件
+micBtn.addEventListener('touchstart', (e) => { e.preventDefault(); startRecording(); }, {passive: false});
+micBtn.addEventListener('touchend', (e) => { e.preventDefault(); stopRecording(); });
+micBtn.addEventListener('touchcancel', () => stopRecording());
+micBtn.addEventListener('mousedown', startRecording);
+micBtn.addEventListener('mouseup', stopRecording);
+micBtn.addEventListener('mouseleave', () => { if (isRecording) stopRecording(); });
+document.addEventListener('touchmove', (e) => {
+  if (e.target.closest('.mic-btn')) e.preventDefault();
+}, {passive: false});
+
+// ============ 实时同步（SSE） ============
+let sse = null;
+function connectSSE() {
+  if (sse) { try { sse.close(); } catch(e){} }
+  sse = new EventSource('/api/stream');
+  const dot = document.getElementById('sse-dot');
+  sse.addEventListener('ready', () => { dot.classList.add('connected'); });
+  sse.addEventListener('change', (ev) => {
+    try {
+      const data = JSON.parse(ev.data);
+      // 收到任何变更，重新加载列表（简单可靠）
+      loadEntries();
+      if (data.event === 'create' && data.entry && data.entry.creator !== ME.username) {
+        toast(`${data.entry.creator_name} 刚录入: ${data.entry.summary}`);
+      }
+    } catch(e) {}
+  });
+  sse.onerror = () => {
+    dot.classList.remove('connected');
+    // 5秒后重连
+    setTimeout(connectSSE, 5000);
+  };
+}
+
+// ============ 账套切换 ============
+async function loadMyBooks() {
+  const data = await api('/api/books');
+  if (!data || !data.ok) { toast('加载账套失败'); return; }
+  myBooks = data.books;
+  // 如果当前选中的账套不在可访问列表里，回退到第一个
+  if (!myBooks.find(b => b.code === currentBook)) {
+    currentBook = myBooks.length > 0 ? myBooks[0].code : 'default';
+    localStorage.setItem('finance_current_book', currentBook);
+  }
+  updateBookLabel();
+}
+
+function updateBookLabel() {
+  const book = myBooks.find(b => b.code === currentBook);
+  document.getElementById('book-label').textContent = book ? book.name : currentBook;
+}
+
+async function loadCategories() {
+  const data = await api('/api/categories?book_code=' + encodeURIComponent(currentBook));
+  if (!data || !data.ok) { categoriesCache = []; return; }
+  categoriesCache = data.categories;
+}
+
+document.getElementById('btn-book').onclick = () => {
+  const listDiv = document.getElementById('books-list');
+  if (myBooks.length === 0) {
+    listDiv.innerHTML = '<div style="color:#86868b;font-size:13px;padding:12px;text-align:center;">您没有任何账套权限<br>请联系管理员授权</div>';
+  } else {
+    listDiv.innerHTML = myBooks.map(b => {
+      const isCur = b.code === currentBook;
+      return `
+        <div class="month-item ${isCur ? 'current' : ''}" onclick="switchBook('${escapeHtml(b.code)}')">
+          <div>
+            <div class="ym">${escapeHtml(b.name)}</div>
+            <div class="cnt">${escapeHtml(b.description || b.code)}</div>
+          </div>
+          <div class="nums">${isCur ? '<span style="color:#007aff;">✓ 当前</span>' : ''}</div>
+        </div>
+      `;
+    }).join('');
+  }
+  document.getElementById('modal-book').classList.add('show');
+};
+
+window.switchBook = async function(code) {
+  if (code === currentBook) { closeModal('modal-book'); return; }
+  currentBook = code;
+  localStorage.setItem('finance_current_book', currentBook);
+  updateBookLabel();
+  closeModal('modal-book');
+  // 清搜索状态，重新加载
+  clearAllSearch();
+  await loadCategories();
+  await loadEntries();
+  toast('已切换到 ' + (myBooks.find(b => b.code === code)?.name || code));
+};
+
+// ============ 锁定/解锁（仅 admin） ============
+document.getElementById('btn-lock').onclick = () => {
+  if (!ME.is_admin) {
+    toast('仅管理员可操作');
+    return;
+  }
+  if (hasSearch()) return;  // 搜索模式下不允许锁定操作
+  const ymStrVal = ymStr(currentView);
+  const isLocking = !currentLockInfo.locked;
+  document.getElementById('lock-modal-title').textContent =
+    isLocking ? `🔒 锁定 ${ymStrVal}` : `🔓 解锁 ${ymStrVal}`;
+  document.getElementById('lock-modal-desc').textContent = isLocking
+    ? '锁定后所有人（含管理员）不能直接修改本月数据，需先解锁。'
+    : '解锁后允许编辑/删除/新增。';
+  document.getElementById('lock-note').value = '';
+  document.getElementById('modal-lock').classList.add('show');
+};
+
+document.getElementById('lock-confirm').onclick = async () => {
+  const ymStrVal = ymStr(currentView);
+  const note = document.getElementById('lock-note').value.trim();
+  let data;
+  if (!currentLockInfo.locked) {
+    data = await api('/api/locks', {method:'POST', body: JSON.stringify({
+      book_code: currentBook, year_month: ymStrVal, note
+    })});
+  } else {
+    const url = `/api/locks?book_code=${encodeURIComponent(currentBook)}&year_month=${ymStrVal}&note=${encodeURIComponent(note)}`;
+    data = await api(url, {method:'DELETE'});
+  }
+  if (data && data.ok) {
+    closeModal('modal-lock');
+    toast(currentLockInfo.locked ? '已解锁' : '已锁定');
+    loadEntries();
+  } else {
+    toast((data && data.error) || '操作失败');
+  }
+};
+
+// ============ 初始化 ============
+(async function init() {
+  await loadMyBooks();
+  await loadCategories();
+  await loadEntries();
+  connectSSE();
+})();
+</script>
+</body>
+</html>
